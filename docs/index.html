@@ -1,0 +1,1653 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arbiter Pulse — Operational intelligence for AI workloads.</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #070908;
+      --bg-2: #0d1110;
+      --bg-3: #141917;
+      --line: #1f2622;
+      --line-2: #2a332e;
+      --ink: #e8eee9;
+      --ink-2: #b6bdb7;
+      --ink-3: #6b736d;
+      --ink-4: #3d433f;
+      --accent: #00E5CC;
+      --accent-dim: #4ea878;
+      --warn: #ffb86b;
+      --danger: #ff7a6b;
+      --serif: "Fraunces", "Times New Roman", serif;
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      --maxw: 1280px;
+      --gutter: clamp(20px, 4vw, 56px);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: clip;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+    /* ============ Background grid ============ */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(to right, rgba(0,229,204,0.028) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,229,204,0.028) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 25%, transparent 78%);
+      -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 25%, transparent 78%);
+    }
+
+    /* ============ MODAL ============ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 9, 8, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 640px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+      padding: 32px 40px;
+      position: relative;
+      transform: translateY(20px) scale(0.95);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.active .modal-content {
+      transform: translateY(0) scale(1);
+    }
+    .modal-close {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      font-size: 24px;
+      line-height: 1;
+      color: var(--ink-2);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .modal-close:hover {
+      color: var(--accent);
+    }
+    .modal-body h3 {
+      font-size: 12px;
+      color: var(--accent);
+      margin-top: 24px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .modal-body p {
+      color: var(--ink-2);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    /* ============ Sticky Scroll Sections (Cards) ============ */
+    main > section {
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+      background: rgba(10, 13, 12, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(0, 229, 204, 0.15);
+      border-radius: 32px 32px 0 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      z-index: 2;
+      box-shadow: 0 -20px 60px rgba(0,0,0,0.7);
+    }
+    
+    main > section:first-of-type {
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border-top: none;
+      box-shadow: none;
+      border-radius: 0;
+    }
+    .bg-noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.28;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    }
+    .bg-glow {
+      position: fixed;
+      width: 1100px; height: 1100px;
+      top: -300px; left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(circle at center, rgba(0,229,204,0.07), transparent 60%);
+      filter: blur(20px);
+    }
+
+    /* ============ Top nav ============ */
+    .topbar {
+      position: relative;
+      z-index: 10;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 22px var(--gutter);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--serif);
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .brand-mark {
+      width: 28px; height: 28px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .brand-mark svg { width: 100%; height: 100%; display: block; }
+    .brand-mark .ring {
+      transform-origin: center;
+      animation: spin 18s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .brand-tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      font-size: 12px;
+      color: var(--ink-2);
+    }
+    .nav-links a {
+      position: relative;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links a::before {
+      content: attr(data-num);
+      font-size: 9px;
+      color: var(--ink-4);
+      margin-right: 6px;
+    }
+    @media (max-width: 800px) {
+      .nav-links { display: none; }
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border: 1px solid var(--line-2);
+      border-radius: 6px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      transition: all .18s ease;
+      background: transparent;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-ghost {
+      border-color: transparent;
+      color: var(--ink-2);
+      padding: 9px 14px;
+    }
+    .btn-ghost:hover {
+      color: var(--ink);
+      border-color: var(--line-2);
+      background: rgba(255,255,255,0.02);
+    }
+    .btn-arrow {
+      display: inline-block;
+      transition: transform .2s ease;
+    }
+    .btn-ghost:hover .btn-arrow { transform: translateX(2px); }
+    .btn-primary {
+      background: var(--accent);
+      color: #062014;
+      border-color: var(--accent);
+      font-weight: 500;
+      padding: 10px 18px;
+      box-shadow: 0 0 0 0 rgba(0,229,204,0), 0 1px 0 rgba(255,255,255,0.15) inset;
+      position: relative;
+      font-family: var(--mono);
+    }
+    .btn-primary:hover {
+      background: #9affc7;
+      color: #062014;
+      box-shadow: 0 0 0 4px rgba(0,229,204,0.18), 0 1px 0 rgba(255,255,255,0.2) inset;
+      transform: translateY(-1px);
+    }
+    .btn .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    .btn-primary .dot {
+      background: #062014;
+      box-shadow: none;
+      animation: none;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* ============ HERO ============ */
+    .hero {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 32px var(--gutter) 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      gap: 56px;
+      align-items: stretch;
+      min-height: 70vh;
+    }
+    @media (max-width: 1000px) {
+      .hero { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--ink-2);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.02);
+      backdrop-filter: blur(4px);
+    }
+    .hero-eyebrow .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    .hero-title {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-variation-settings: "opsz" 144, "SOFT" 50;
+      font-size: clamp(48px, 6.5vw, 84px);
+      line-height: 0.96;
+      letter-spacing: -0.035em;
+      margin: 28px 0 0;
+      color: var(--ink);
+    }
+    .hero-title em {
+      font-style: italic;
+      font-weight: 300;
+      color: var(--accent);
+      position: relative;
+    }
+    .hero-title em::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0;
+      bottom: 0.04em;
+      height: 1px;
+      background: var(--accent-dim);
+      opacity: 0.4;
+    }
+
+    .hero-sub {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(17px, 1.5vw, 21px);
+      line-height: 1.45;
+      color: var(--ink-2);
+      max-width: 52ch;
+      margin: 28px 0 0;
+      letter-spacing: -0.005em;
+    }
+    .hero-sub strong {
+      color: var(--ink);
+      font-weight: 400;
+    }
+
+    .hero-cta {
+      margin-top: 36px;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .instructions {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      margin-top: 24px;
+      display: none;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-2);
+      backdrop-filter: blur(4px);
+    }
+    .instructions h3 {
+      font-size: 13px;
+      color: var(--warn);
+      margin: 0 0 12px 0;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .instructions p { margin: 0 0 12px 0; }
+    .instructions ol { margin: 0; padding-left: 20px; }
+    .instructions li { margin-bottom: 6px; }
+    .instructions code {
+      color: var(--ink);
+      background: var(--bg-2);
+      padding: 2px 6px;
+      border: 1px solid var(--line-2);
+      border-radius: 4px;
+    }
+
+    /* ============ CENTERPIECE ============ */
+    .centerpiece {
+      position: relative;
+      align-self: stretch;
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel {
+      position: relative;
+      background: linear-gradient(180deg, rgba(13,17,16,0.92), rgba(7,9,8,0.92));
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(120% 60% at 50% 0%, rgba(0,229,204,0.08), transparent 60%);
+    }
+
+    .panel-bar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      background: rgba(0,0,0,0.3);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .panel-bar .live {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--accent);
+    }
+    .panel-bar .live .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    .telemetry-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 160px;
+      margin-top: 16px;
+    }
+    .chart-wrap svg { width: 100%; height: 100%; display: block; }
+    .chart-axis { position: absolute; inset: 0; pointer-events: none; }
+    .chart-y, .chart-x { position: absolute; font-family: var(--mono); font-size: 9px; color: var(--ink-4); letter-spacing: 0.04em; }
+    .chart-y { left: 0; top: 0; bottom: 0; width: 44px; }
+    .chart-y span { position: absolute; right: 6px; }
+    .chart-x { left: 44px; right: 0; bottom: -2px; display: flex; justify-content: space-between; }
+
+    .substats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      margin-top: 24px;
+    }
+    .substat {
+      background: rgba(7,9,8,0.7);
+      padding: 12px 14px;
+    }
+    .substat-k {
+      font-size: 9px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+    .substat-v {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .substat-v .u {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      margin-left: 4px;
+    }
+
+    .stream {
+      margin-top: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(0,0,0,0.4);
+      font-family: var(--mono);
+      font-size: 11px;
+      overflow: hidden;
+      flex: 1;
+    }
+    .stream-head {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-3);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      display: flex;
+      justify-content: space-between;
+    }
+    .stream-list {
+      list-style: none;
+      margin: 0; padding: 0;
+    }
+    .stream-list li {
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: 70px 80px 1fr auto;
+      gap: 10px;
+      color: var(--ink-2);
+      border-bottom: 1px dashed rgba(31,38,34,0.6);
+      align-items: center;
+      animation: slideIn .4s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .stream-list li .t { color: var(--ink-4); }
+    .stream-list li .m { color: var(--accent-dim); }
+    .stream-list li .save { color: var(--warn); text-align: right; }
+    .stream-list li .save.high { color: var(--accent); }
+
+    /* ============ CONTENT GRIDS & ANIMATIONS ============ */
+    .content-section {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 120px auto 80px;
+      padding: 0 var(--gutter);
+    }
+    
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+    .reveal.active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .section-eyebrow {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .section-eyebrow .pdot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    /* Tier Grid */
+    .tier-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tier-row {
+      display: grid;
+      grid-template-columns: 140px 1.5fr 2.5fr;
+      background: var(--line);
+      padding: 1px;
+      border-radius: 8px;
+      gap: 1px;
+    }
+    .tier-cell {
+      background: var(--bg-2);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+    }
+    .tier-row:hover .tier-cell {
+      background: rgba(13,17,16, 0.8);
+    }
+    .tier-num { font-family: var(--mono); color: var(--accent); font-size: 10px; }
+    .tier-name { font-family: var(--serif); font-size: 20px; color: var(--ink); margin: 0; font-weight: 300; }
+    .tier-desc { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+    
+    @media (max-width: 800px) {
+      .tier-row { grid-template-columns: 1fr; }
+      .tier-cell { padding: 12px 16px; }
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px;
+    }
+    @media (max-width: 800px) {
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+
+    .feature-card {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      padding: 28px;
+      border-radius: 12px;
+    }
+    .feature-card h3 {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 24px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      margin: 0 0 12px 0;
+    }
+    .feature-card p {
+      color: var(--ink-2);
+      margin: 0;
+    }
+
+    .chips-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .tag {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-2);
+      padding: 6px 14px;
+      border: 1px solid var(--line-2);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    /* ============ FOOTER ============ */
+    footer {
+      position: relative;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 40px var(--gutter);
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      color: var(--ink-3);
+      font-size: 12px;
+    }
+    footer a { transition: color .2s; }
+    footer a:hover { color: var(--ink); }
+
+    .coord-readout {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--mono);
+      color: var(--accent-dim);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      opacity: 0.6;
+    }
+    @media (max-width: 800px) {
+      .coord-readout { display: none; }
+    }
+
+  </style>
+</head>
+<body>
+  <!-- ===================== ATMOSPHERIC ENTRY LAYER ===================== -->
+  <div id="pulse-entry-spacer" style="height: 400vh; width: 100vw; position: relative; pointer-events: none; z-index: 0;"></div>
+  
+  <div id="pulse-entry-layer" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; pointer-events: none; background: #070908; overflow: hidden; display: flex; align-items: center; justify-content: center; transition: opacity 0.3s ease;">
+    
+    <canvas id="thermalCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></canvas>
+
+    <div id="pulse-center-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; font-family: var(--serif); font-size: clamp(40px, 8vw, 80px); font-weight: 300; letter-spacing: -0.02em; color: #fff; text-shadow: 0 4px 20px rgba(0,229,204,0.3); pointer-events: none; white-space: nowrap; transition: opacity 0.2s, transform 0.2s;">
+      <svg id="hero-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: absolute; left: -1.2em; top: 50%; margin-top: -0.4em; height: 0.8em; width: 0.8em; opacity: 0; transform: scale(0.8); filter: drop-shadow(0 0 0px rgba(0,229,204,0));">
+        <defs>
+          <filter id="pulse-bloom-hero" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+          </filter>
+        </defs>
+        <circle cx="24" cy="24" r="12" fill="#00E5CC" opacity="0.15" filter="url(#pulse-bloom-hero)" />
+        <circle cx="24" cy="24" r="8" fill="#00E5CC" />
+      </svg>
+      Arbiter Pulse
+    </div>
+
+    <!-- HUD LOGS -->
+    <div id="pulse-hud" style="position: absolute; bottom: 40px; left: 40px; font-family: var(--mono); font-size: 11px; color: var(--accent); z-index: 10; opacity: 0; transition: opacity 0.5s;">
+      <div style="color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.2em; font-size: 10px; margin-bottom: 12px;">[ Neural Telemetry Logs ]</div>
+      <div id="hud-log-1" style="margin-bottom: 6px;"></div>
+      <div id="hud-log-2" style="margin-bottom: 6px;"></div>
+      <div id="hud-log-3" style="margin-bottom: 6px;"></div>
+    </div>
+    
+    <!-- HUD STATS -->
+    <div id="pulse-hud-stats" style="position: absolute; top: 40px; right: 40px; font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.6); text-align: right; z-index: 10; opacity: 0; transition: opacity 0.5s; text-transform: uppercase; letter-spacing: 0.1em;">
+      <div>Unmapped Threads: <span id="stat-nodes" style="color:#ff7a6b; font-weight:bold; margin-left: 6px;">2,841</span></div>
+      <div style="margin-top: 8px;">Redundancy: <span id="stat-waste" style="color:#ff7a6b; font-weight:bold; margin-left: 6px;">74%</span></div>
+      <div style="margin-top: 8px;">Network Topology: <span id="stat-status" style="color:#ff7a6b; font-weight: bold; margin-left: 6px;">CHAOTIC</span></div>
+    </div>
+  </div>
+  <!-- ===================== END ENTRY LAYER ===================== -->
+
+  <!-- Ambient Background -->
+  <div class="bg-grid"></div>
+  <div class="bg-noise"></div>
+  <div class="bg-glow"></div>
+
+  <!-- Navbar -->
+  <nav class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="pulse-bloom-nav" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+            </filter>
+          </defs>
+          <circle cx="24" cy="24" r="12" fill="#00E5CC" opacity="0.15" filter="url(#pulse-bloom-nav)" />
+          <circle cx="24" cy="24" r="8" fill="#00E5CC" />
+        </svg>
+      </div>
+      Arbiter Pulse
+      <span class="brand-tag">v0.1.0</span>
+    </div>
+    <div class="nav-links">
+      <a href="#architecture" data-num="01">Architecture</a>
+      <a href="#privacy" data-num="02">Privacy</a>
+      <a href="#features" data-num="03">Features</a>
+      <a href="https://github.com/mirzamudabbir-dev/ArbiterPulse-LandingPage" data-num="04">GitHub</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div>
+      <div class="hero-eyebrow">
+        <div class="dot"></div> System Daemon
+      </div>
+      <h1 class="hero-title">Operational <em>intelligence</em><br>for AI workloads.</h1>
+      <p class="hero-sub">A background daemon that understands the operational relationships between AI execution environments. Requires less than <strong>3% CPU overhead</strong>.</p>
+      
+      <div class="hero-cta" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;">
+        <button class="btn btn-primary" onclick="downloadApp('macos')">
+          <div class="dot"></div> Download for macOS
+        </button>
+        <button class="btn btn-primary" onclick="downloadApp('windows')">
+          <div class="dot"></div> Download for Windows
+        </button>
+        <button class="btn btn-ghost" onclick="document.getElementById('how-modal').classList.add('active')">
+          How It Works <span class="btn-arrow">→</span>
+        </button>
+      </div>
+      
+      <div id="instructions-container" class="instructions"></div>
+    </div>
+
+    <div class="centerpiece">
+      <div class="panel">
+        <div class="panel-bar">
+          <span>PULSE_ACTIVITY_MONITOR</span>
+          <span>SYSTEM_TELEMETRY</span>
+          <div class="live"><div class="dot"></div> LIVE</div>
+        </div>
+        <div class="telemetry-body">
+          <div class="chart-wrap">
+            <div class="chart-y">
+              <span style="top:12px">4%</span>
+              <span style="top:74px">2%</span>
+              <span style="top:136px">0%</span>
+            </div>
+            <div class="chart-x">
+              <span>-60s</span>
+              <span>-30s</span>
+              <span>NOW</span>
+            </div>
+            <div class="chart-axis"></div>
+            <svg viewBox="0 0 600 180" preserveAspectRatio="none">
+              <!-- Budget limit line at 3% -->
+              <path id="basePath" fill="none" stroke="var(--ink-4)" stroke-width="1.5" stroke-dasharray="4 4"/>
+              <path id="optArea" fill="url(#areaGrad)" />
+              <path id="optPath" fill="none" stroke="var(--accent)" stroke-width="2" />
+              <circle id="liveDotPulse" r="8" fill="var(--accent)" opacity="0.4" />
+              <circle id="liveDot" r="4" fill="var(--accent)" />
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.15"/>
+                  <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          
+          <div class="substats">
+            <div class="substat">
+              <div class="substat-k">ACTIVE WORKLOADS</div>
+              <div class="substat-v" id="wkldVal">3<span class="u">procs</span></div>
+            </div>
+            <div class="substat">
+              <div class="substat-k">CPU OVERHEAD</div>
+              <div class="substat-v"><span id="cpuVal">1.2</span><span class="u">%</span></div>
+            </div>
+            <div class="substat">
+              <div class="substat-k">POWER DRAW</div>
+              <div class="substat-v"><span id="pwrVal">24.5</span><span class="u">W</span></div>
+            </div>
+          </div>
+          
+          <div class="stream">
+            <div class="stream-head">
+              <span>DETECTED ENVIRONMENTS</span>
+              <span>STATUS</span>
+            </div>
+            <ul class="stream-list">
+              <!-- JS Populated -->
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Performance Comparison -->
+  <section id="performance" class="content-section reveal">
+    <div class="section-eyebrow"><div class="pdot"></div> Performance Footprint</div>
+    <div style="text-align: center; margin-bottom: 48px;">
+      <h2 class="hero-title" style="font-size: clamp(32px, 4vw, 56px); margin-top: 0;">Built for <em>Stealth</em>.</h2>
+      <p class="hero-sub" style="margin: 16px auto 0; text-align: center;">Pulse is engineered in Rust and Tauri. It monitors the system without becoming the bottleneck.</p>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 800px; margin: 0 auto;">
+      <div style="background: var(--line); border-radius: 8px; padding: 1px;">
+        <div style="background: var(--bg-2); border-radius: 7px; padding: 24px; text-align: center; height: 100%;">
+          <div style="color: var(--ink-3); font-family: var(--mono); font-size: 11px; margin-bottom: 12px; letter-spacing: 0.1em;">TYPICAL ELECTRON APP</div>
+          <div style="font-family: var(--serif); font-size: 48px; color: var(--ink-2); line-height: 1;">350<span style="font-family: var(--mono); font-size: 16px;">MB</span></div>
+          <div style="margin-top: 16px; background: var(--line); height: 4px; border-radius: 2px; width: 100%;"><div style="background: var(--ink-4); width: 85%; height: 100%; border-radius: 2px;"></div></div>
+        </div>
+      </div>
+      <div style="background: linear-gradient(180deg, var(--accent-dim), transparent); border-radius: 8px; padding: 1px;">
+        <div style="background: linear-gradient(180deg, rgba(13,17,16,0.92), rgba(7,9,8,0.92)); border-radius: 7px; padding: 24px; text-align: center; height: 100%; box-shadow: inset 0 1px 0 rgba(0,229,204,0.1);">
+          <div style="color: var(--accent); font-family: var(--mono); font-size: 11px; margin-bottom: 12px; letter-spacing: 0.1em;">ARBITER PULSE (RUST + TAURI)</div>
+          <div style="font-family: var(--serif); font-size: 48px; color: var(--accent); line-height: 1; text-shadow: 0 0 16px rgba(0,229,204,0.2);">18<span style="font-family: var(--mono); font-size: 16px;">MB</span></div>
+          <div style="margin-top: 16px; background: var(--line); height: 4px; border-radius: 2px; width: 100%;"><div style="background: var(--accent); width: 6%; height: 100%; border-radius: 2px; box-shadow: 0 0 8px var(--accent);"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy & Security -->
+  <section id="privacy" class="content-section reveal">
+    <div class="section-eyebrow"><div class="pdot"></div> Security & Privacy</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 56px; align-items: center;">
+      
+      <!-- Mock Terminal -->
+      <div style="background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-family: var(--mono); font-size: 11px;">
+        <div style="background: var(--line); padding: 8px 12px; display: flex; gap: 8px;">
+          <div style="width:10px; height:10px; border-radius:50%; background:#ff5f56;"></div>
+          <div style="width:10px; height:10px; border-radius:50%; background:#ffbd2e;"></div>
+          <div style="width:10px; height:10px; border-radius:50%; background:#27c93f;"></div>
+        </div>
+        <div style="padding: 16px; color: var(--ink-2); line-height: 1.6; height: 180px; overflow: hidden;" id="termWindow">
+          <!-- JS will populate logs here -->
+        </div>
+      </div>
+
+      <!-- Privacy Copy -->
+      <div>
+        <h2 class="hero-title" style="font-size: clamp(32px, 4vw, 56px); margin-top: 0;">Local First.<br><em>Zero</em> Telemetry.</h2>
+        <p class="hero-sub" style="font-size: 16px; margin-top: 20px;">Pulse operates at the kernel boundary using eBPF and the macOS Endpoint Security Framework (ESF). By design, it requires deep system access—which is why <strong>no telemetry leaves your machine</strong>. Every baseline is computed locally.</p>
+        
+        <div style="margin-top: 24px; display: flex; gap: 32px;">
+          <div>
+            <div style="color: var(--accent); font-family: var(--mono); font-size: 10px; margin-bottom: 4px; letter-spacing: 0.1em;">DATA RETENTION</div>
+            <div style="color: var(--ink);">Strictly Local (SQLite)</div>
+          </div>
+          <div>
+            <div style="color: var(--accent); font-family: var(--mono); font-size: 10px; margin-bottom: 4px; letter-spacing: 0.1em;">SOURCE CODE</div>
+            <div style="color: var(--ink);">100% Auditable</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Section -->
+  <section id="architecture" class="content-section reveal">
+    <div class="section-eyebrow">
+      <div class="pdot"></div> The Five-Tier System
+    </div>
+    <div class="tier-grid">
+      <div class="tier-row">
+        <div class="tier-cell"><div class="tier-num">TIER 1</div></div>
+        <div class="tier-cell"><h3 class="tier-name">Presentation</h3></div>
+        <div class="tier-cell"><p class="tier-desc">React + TypeScript + Tauri shell. Sub-16ms render constraint to ensure zero UI lag.</p></div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell"><div class="tier-num">TIER 2</div></div>
+        <div class="tier-cell"><h3 class="tier-name">Local Service</h3></div>
+        <div class="tier-cell"><p class="tier-desc">Tauri IPC + FastAPI sidecar serving data with less than 50ms latency over UNIX sockets.</p></div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell"><div class="tier-num">TIER 3</div></div>
+        <div class="tier-cell"><h3 class="tier-name">Intelligence</h3></div>
+        <div class="tier-cell"><p class="tier-desc">Python-based correlation engine, River baseline modelling, and deterministic insight generation.</p></div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell"><div class="tier-num">TIER 4</div></div>
+        <div class="tier-cell"><h3 class="tier-name">Telemetry Daemon</h3></div>
+        <div class="tier-cell"><p class="tier-desc">Rust core operating the collectors, classifier, and SQLite writer. Strictly policed under 1.5% CPU.</p></div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell"><div class="tier-num">TIER 5</div></div>
+        <div class="tier-cell"><h3 class="tier-name">Kernel Boundary</h3></div>
+        <div class="tier-cell"><p class="tier-desc">Direct interface with macOS IOReport, ESF, and Linux eBPF for zero-overhead OS interception.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stability Guard Section -->
+  <section id="guard" class="content-section reveal">
+    <div class="section-eyebrow"><div class="pdot"></div> Intervention Logic</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 56px; align-items: center;">
+      <div>
+        <h2 class="hero-title" style="font-size: clamp(32px, 4vw, 56px); margin-top: 0;">The Three-Gate <em>Criterion</em>.</h2>
+        <p class="hero-sub" style="font-size: 16px; margin-top: 20px;">Intervention only occurs when anomalies pass a strict gauntlet. Anomalies must be <strong>traceable</strong> to a root cause, actively <strong>progressing</strong> toward threshold, and <strong>actionable</strong>. Pulse is not an alarm system; it's a stability guard.</p>
+        <p style="color: var(--ink-3); margin-top: 24px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase;">Scatter Plot: Process Execution Variance</p>
+      </div>
+      <div style="background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 24px; position: relative;">
+        <svg id="varianceDots" viewBox="0 0 600 220" style="width: 100%; height: 220px;"></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="content-section reveal">
+    <div class="section-eyebrow">
+      <div class="pdot"></div> Core Features
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>Four-Signal Classifier</h3>
+        <p>Combines process state, boundary tracing, network patterns, and behavioral signatures to precisely identify local and cloud AI workloads.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Activity Baselines</h3>
+        <p>River-based per-user baselines compute a normalized 0–100 inference activity score based on historical usage patterns.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Correlation Engine</h3>
+        <p>Five asynchronous detectors run continuously over a 60-second window to surface hardware contention and execution fragmentation.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Overhead Enforcer</h3>
+        <p>The daemon polices its own resource utilization. Sustained CPU usage pauses non-critical collectors to maintain the 3% budget.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detected Environments Section -->
+  <section id="detects" class="content-section reveal">
+    <div class="section-eyebrow">
+      <div class="pdot"></div> Supported Environments
+    </div>
+    <div class="chips-grid">
+      <span class="tag">Ollama</span>
+      <span class="tag">LM Studio</span>
+      <span class="tag">Claude Code</span>
+      <span class="tag">Cursor</span>
+      <span class="tag">Windsurf</span>
+      <span class="tag">Zed</span>
+      <span class="tag">VS Code</span>
+      <span class="tag">Brave AI</span>
+      <span class="tag">Chrome AI</span>
+      <span class="tag">Docker AI</span>
+      <span class="tag">Perplexity</span>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 32px;">
+      <div>Local-only · No telemetry</div>
+      <div id="coord" class="coord-readout">x:0000 y:0000 · SYSTEM: STABLE · GATE: ACTIVE</div>
+      <div><a href="https://github.com/mirzamudabbir-dev/ArbiterPulse-LandingPage">GitHub</a></div>
+    </div>
+    <div style="text-align: center; color: var(--ink-4);">
+      © 2026 AMEARF Inc. · parent of Arbiter Pulse
+    </div>
+  </footer>
+
+  <script>
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    window.addEventListener('load', () => {
+      setTimeout(() => { 
+        window.scrollTo(0, 0); 
+        setTimeout(() => {
+          document.documentElement.style.scrollBehavior = 'smooth';
+        }, 50);
+      }, 10);
+    });
+    // Downloads
+    const RELEASE_BASE = 'https://github.com/mirzamudabbir-dev/ArbiterPulse-LandingPage/releases/latest/download';
+    const DOWNLOADS = {
+      macos: `${RELEASE_BASE}/Pulse_aarch64.dmg`,
+      windows: `${RELEASE_BASE}/Pulse_x64-setup.exe`,
+    };
+
+    function downloadApp(os) {
+      window.location.href = DOWNLOADS[os];
+      const container = document.getElementById('instructions-container');
+      container.style.display = 'block';
+      
+      if (os === 'macos') {
+        container.innerHTML = `
+          <h3>macOS Installation</h3>
+          <p>You may see a macOS security warning when opening the app. This is expected for unsigned indie software.</p>
+          <p>To install:</p>
+          <ol>
+            <li>Open <code>Pulse_aarch64.dmg</code> and drag Pulse to Applications</li>
+            <li>Right-click Pulse in your Applications folder</li>
+            <li>Select "Open"</li>
+            <li>Click "Open" again in the security dialog</li>
+          </ol>
+          <p>This is a one-time step.</p>
+        `;
+      } else if (os === 'windows') {
+        container.innerHTML = `
+          <h3>Windows Installation</h3>
+          <p>You may see a Windows SmartScreen warning when running the installer. This is expected for indie software without a paid code signing certificate.</p>
+          <p>To install:</p>
+          <ol>
+            <li>Double-click <code>Pulse_x64-setup.exe</code></li>
+            <li>Click "More info"</li>
+            <li>Click "Run anyway"</li>
+            <li>Installation proceeds normally</li>
+          </ol>
+          <p>This is a one-time step.</p>
+        `;
+      }
+    }
+
+    // Scroll Animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(sec => observer.observe(sec));
+
+    // Terminal Typewriter
+    const termWindow = document.getElementById('termWindow');
+    const termLogs = [
+      "arbiter_daemon v0.1.0 starting...",
+      "Loading baseline model (river-0.2)... OK",
+      "Initializing SQLite local store... OK",
+      "Binding to macOS ESF (Endpoint Security)... OK",
+      "Awaiting telemetry streams...",
+      "-> Process [Ollama] matched signature 0x8F2",
+      "-> Allocating 1.2MB memory boundary",
+      "-> Stream active."
+    ];
+    let termIndex = 0;
+    function typeTerm() {
+      if (termIndex >= termLogs.length || !termWindow) return;
+      const p = document.createElement('div');
+      p.style.marginBottom = "4px";
+      if (termLogs[termIndex].includes("->")) {
+        p.style.color = "var(--ink-4)";
+      } else if (termLogs[termIndex].includes("OK")) {
+        p.innerHTML = termLogs[termIndex].replace("OK", '<span style="color:var(--accent);">OK</span>');
+      } else {
+        p.textContent = termLogs[termIndex];
+      }
+      termWindow.appendChild(p);
+      termIndex++;
+      setTimeout(typeTerm, 300 + Math.random() * 800);
+    }
+    setTimeout(typeTerm, 1000);
+
+    // Chart Animation
+    const optPath = document.getElementById('optPath');
+    const optArea = document.getElementById('optArea');
+    const basePath = document.getElementById('basePath');
+    const liveDot = document.getElementById('liveDot');
+    const liveDotPulse = document.getElementById('liveDotPulse');
+
+    const W = 600, H = 180;
+    const left = 48, right = 600, top_ = 18, bot = 156;
+    const N = 80;
+    let series = [];
+    let baseSeries = [];
+
+    for (let i = 0; i < N; i++) {
+      const phase = i / N;
+      const baseY = bot - 30; 
+      const optY = bot - (Math.sin(phase * 4 + 1) * 8 + 40 + Math.random() * 6);
+      baseSeries.push(baseY);
+      series.push(optY);
+    }
+
+    function pathFor(arr) {
+      const step = (right - left) / (arr.length - 1);
+      let d = '';
+      arr.forEach((y, i) => {
+        const x = left + step * i;
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      });
+      return d.trim();
+    }
+    function areaFor(arr) {
+      const step = (right - left) / (arr.length - 1);
+      let d = '';
+      arr.forEach((y, i) => {
+        const x = left + step * i;
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      });
+      d += 'L' + right + ' ' + bot + ' L' + left + ' ' + bot + ' Z';
+      return d;
+    }
+
+    let pulseT = 0;
+    function drawChart() {
+      series.shift();
+      baseSeries.shift();
+      const last = series[series.length - 1];
+      
+      const newBase = bot - 30; // 3% line
+      let newOpt = last + (Math.random() - 0.5) * 8;
+      newOpt = Math.max(top_ + 60, Math.min(bot - 30, newOpt));
+      
+      series.push(newOpt);
+      baseSeries.push(newBase);
+
+      if (basePath) basePath.setAttribute('d', pathFor(baseSeries));
+      if (optPath) optPath.setAttribute('d', pathFor(series));
+      if (optArea) optArea.setAttribute('d', areaFor(series));
+      if (liveDot) {
+        liveDot.setAttribute('cx', right);
+        liveDot.setAttribute('cy', newOpt);
+      }
+      if (liveDotPulse) {
+        liveDotPulse.setAttribute('cx', right);
+        liveDotPulse.setAttribute('cy', newOpt);
+        pulseT = (pulseT + 1) % 18;
+        const r = 4 + (pulseT / 18) * 12;
+        const op = 0.7 - (pulseT / 18) * 0.7;
+        liveDotPulse.setAttribute('r', r.toFixed(1));
+        liveDotPulse.setAttribute('opacity', op.toFixed(2));
+      }
+    }
+    setInterval(drawChart, 100);
+
+    // Stream Event Log
+    const streamList = document.querySelector('.stream-list');
+    const MODELS = [
+      ['Ollama', ':11434', 'local'],
+      ['Cursor', 'api2', 'cloud'],
+      ['Claude Code', 'CLI', 'local'],
+      ['Docker AI', 'dockerd', 'local'],
+      ['Windsurf', 'WSS', 'cloud']
+    ];
+    function pad(n, w) { return String(n).padStart(w, '0'); }
+    function timeStr() {
+      const d = new Date();
+      return pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2) + ':' + pad(d.getSeconds(), 2);
+    }
+    function pushStream() {
+      if (!streamList) return;
+      const m = MODELS[Math.floor(Math.random() * MODELS.length)];
+      const conf = Math.random() > 0.7 ? 'High' : (Math.random() > 0.4 ? 'Medium' : 'Low');
+      const li = document.createElement('li');
+      const confClass = conf === 'High' ? 'high' : '';
+      li.innerHTML = 
+        '<span class="t">' + timeStr() + '</span>' +
+        '<span class="m">' + m[2] + '</span>' +
+        '<span>' + m[0] + ' <span style="color:var(--ink-4)">@ ' + m[1] + '</span></span>' +
+        '<span class="save ' + confClass + '">' + conf + '</span>';
+      streamList.insertBefore(li, streamList.firstChild);
+      while (streamList.children.length > 4) {
+        streamList.removeChild(streamList.lastChild);
+      }
+    }
+    for(let i=0; i<4; i++) pushStream();
+    setInterval(pushStream, 1800 + Math.random() * 1000);
+
+    // Substats drift
+    const cpuVal = document.getElementById('cpuVal');
+    const pwrVal = document.getElementById('pwrVal');
+    let cpu = 1.2, pwr = 24.5;
+    setInterval(() => {
+      cpu += (Math.random() - 0.5) * 0.2;
+      if(cpu < 0.5) cpu = 0.5; if(cpu > 2.8) cpu = 2.8;
+      pwr += (Math.random() - 0.5) * 2;
+      if(pwr < 12) pwr = 12; if(pwr > 45) pwr = 45;
+      if(cpuVal) cpuVal.textContent = cpu.toFixed(1);
+      if(pwrVal) pwrVal.textContent = pwr.toFixed(1);
+    }, 2000);
+
+    // Variance Scatter Plot
+    const dotsG = document.getElementById('varianceDots');
+    if (dotsG) {
+      const colors = ['#00E5CC','#4ea878','#ffb86b'];
+      const W2 = 600, H2 = 220, cx = 300;
+      function gauss() { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+      let html = '';
+      for (let i = 0; i < 180; i++) {
+        const variance = gauss() * 0.12; 
+        const x = cx + variance * (W2-80) * 2;
+        const y = 20 + Math.random() * 180;
+        const c = colors[i % 3];
+        const r = 1.6 + Math.random() * 2.2;
+        html += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+c+'" opacity="'+(0.3+Math.random()*0.5).toFixed(2)+'"/>';
+      }
+      dotsG.innerHTML = html;
+    }
+
+    // Coordinate Footer Readout
+    function padCoord(n) { return String(n).padStart(4, '0'); }
+    const coord = document.getElementById('coord');
+    document.addEventListener('mousemove', (e) => {
+      if(coord) coord.textContent = 'x:' + padCoord(e.clientX) + ' y:' + padCoord(e.clientY) + ' · SYSTEM: STABLE · GATE: ACTIVE';
+    });
+
+    // ===================== ATMOSPHERIC ENTRY LOGIC (OPTION 1) =====================
+    (function() {
+      const thermalCanvas = document.getElementById('thermalCanvas');
+      const entryLayer = document.getElementById('pulse-entry-layer');
+      const centerText = document.getElementById('pulse-center-text');
+      
+      const hud = document.getElementById('pulse-hud');
+      const hudStats = document.getElementById('pulse-hud-stats');
+      const log1 = document.getElementById('hud-log-1');
+      const log2 = document.getElementById('hud-log-2');
+      const log3 = document.getElementById('hud-log-3');
+      const sNodes = document.getElementById('stat-nodes');
+      const sWaste = document.getElementById('stat-waste');
+      const sStatus = document.getElementById('stat-status');
+
+      if (!thermalCanvas) return;
+      const ctx = thermalCanvas.getContext('2d', { alpha: false });
+      
+      let width, height;
+      let scrollProgress = 0;
+      let nodes = [];
+      
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        thermalCanvas.width = width;
+        thermalCanvas.height = height;
+        initNetwork();
+      }
+
+      function initNetwork() {
+        nodes = [];
+        let cx = width / 2;
+        let cy = height / 2;
+        
+        let gridSize = width < 768 ? 60 : 80;
+        let cols = Math.floor(width / gridSize) + 2;
+        let rows = Math.floor(height / gridSize) + 2;
+        let startX = (width - cols * gridSize) / 2;
+        let startY = (height - rows * gridSize) / 2;
+        
+        // Keep-out zone for the center HTML text
+        let textW = width < 768 ? 300 : 550;
+        let textH = 150;
+        
+        let gridNodes = [];
+        
+        for (let r = 0; r < rows; r++) {
+           for (let c = 0; c < cols; c++) {
+              let tx = startX + c * gridSize;
+              let ty = startY + r * gridSize;
+              
+              // Add slight jitter so the grid doesn't look too perfectly rigid
+              tx += (Math.random() - 0.5) * (gridSize * 0.3);
+              ty += (Math.random() - 0.5) * (gridSize * 0.3);
+              
+              if (Math.abs(tx - cx) < textW/2 && Math.abs(ty - cy) < textH/2) {
+                 continue; // Skip center area to avoid overlapping text
+              }
+              
+              let node = {
+                id: nodes.length,
+                isAnomaly: false,
+                chaosX: Math.random() * width,
+                chaosY: Math.random() * height,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: (Math.random() - 0.5) * 1.5,
+                targetX: tx,
+                targetY: ty,
+                row: r,
+                col: c,
+                neighbors: []
+              };
+              nodes.push(node);
+              gridNodes.push(node);
+           }
+        }
+        
+        // Generate correlation connections
+        for (let i = 0; i < gridNodes.length; i++) {
+           let n = gridNodes[i];
+           for (let j = i+1; j < gridNodes.length; j++) {
+              let n2 = gridNodes[j];
+              let dr = Math.abs(n.row - n2.row);
+              let dc = Math.abs(n.col - n2.col);
+              
+              // Orthogonal connections (80% chance for broken/organic look)
+              if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+                 if (Math.random() > 0.2) n.neighbors.push(n2.id); 
+              }
+              // Diagonal correlations (20% chance)
+              if (dr === 1 && dc === 1) {
+                 if (Math.random() > 0.8) n.neighbors.push(n2.id);
+              }
+           }
+        }
+        
+        // Add anomalies
+        let anomalyCount = width < 768 ? 20 : 60;
+        for(let i = 0; i < anomalyCount; i++) {
+          nodes.push({
+            id: nodes.length,
+            isAnomaly: true,
+            chaosX: Math.random() * width,
+            chaosY: Math.random() * height,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            targetX: Math.random() * width,
+            targetY: height + 200, 
+            neighbors: []
+          });
+        }
+      }
+
+      function render(time) {
+          ctx.fillStyle = "#070908";
+          ctx.fillRect(0, 0, width, height);
+
+          let scanY = (scrollProgress * 1.2 - 0.1) * height;
+
+          for(let i=0; i<nodes.length; i++) {
+             let n = nodes[i];
+             n.chaosX += n.vx;
+             n.chaosY += n.vy;
+             
+             if(n.chaosX < 0 || n.chaosX > width) n.vx *= -1;
+             if(n.chaosY < 0 || n.chaosY > height) n.vy *= -1;
+
+             let pushY = 0;
+             let distToScan = scanY - n.chaosY; 
+             let orgFactor = 0;
+             if (scrollProgress > 0.02) {
+                if (distToScan > 40) {
+                   orgFactor = 1;
+                } else if (distToScan > 0) {
+                   orgFactor = distToScan / 40;
+                } else if (distToScan > -120 && distToScan <= 0 && !n.isAnomaly) {
+                   let pushFactor = Math.pow(1 - (Math.abs(distToScan) / 120), 2);
+                   pushY = pushFactor * 80;
+                }
+             }
+             if (scrollProgress > 0.85) orgFactor = 1; 
+             
+             let ease = orgFactor * orgFactor * (3 - 2 * orgFactor);
+             
+             n.x = n.chaosX * (1 - ease) + n.targetX * ease;
+             let currentChaosY = n.chaosY + pushY;
+             n.y = currentChaosY * (1 - ease) + n.targetY * ease;
+             n.orgFactor = ease;
+          }
+
+          if (scrollProgress > 0 && scrollProgress < 0.9) {
+             let grad = ctx.createLinearGradient(0, scanY - 80, 0, scanY);
+             grad.addColorStop(0, "rgba(0, 229, 204, 0)");
+             grad.addColorStop(0.8, "rgba(0, 229, 204, 0.15)");
+             grad.addColorStop(1, "rgba(0, 229, 204, 0.8)");
+             ctx.fillStyle = grad;
+             ctx.fillRect(0, scanY - 80, width, 80);
+             
+             ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+             ctx.fillRect(0, scanY, width, 1);
+          }
+
+          ctx.lineWidth = 1;
+          for(let i=0; i<nodes.length; i++) {
+             let n = nodes[i];
+             if (n.isAnomaly && n.orgFactor > 0.5) continue;              
+             if (n.orgFactor < 0.8) {
+               for(let j=i+1; j<nodes.length; j++) {
+                 let n2 = nodes[j];
+                 if (n2.isAnomaly && n2.orgFactor > 0.5) continue;
+                 
+                 let d = Math.hypot(n.x - n2.x, n.y - n2.y);
+                 if (d < 120) { 
+                    let op = (1 - d/120) * (1 - Math.max(n.orgFactor, n2.orgFactor));
+                    if (n.isAnomaly || n2.isAnomaly) {
+                       ctx.strokeStyle = `rgba(255, 122, 107, ${op})`;
+                    } else {
+                       ctx.strokeStyle = `rgba(255, 255, 255, ${op * 0.3})`; 
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(n.x, n.y);
+                    ctx.lineTo(n2.x, n2.y);
+                    ctx.stroke();
+                 }
+               }
+             }
+
+             if (n.orgFactor < 0.8) {
+               for(let j=i+1; j<nodes.length; j++) {
+                 let n2 = nodes[j];
+                 if (n2.isAnomaly && n2.orgFactor > 0.5) continue;
+                 
+                 let d = Math.hypot(n.x - n2.x, n.y - n2.y);
+                 if (d < 120) { 
+                    let op = (1 - d/120) * (1 - Math.max(n.orgFactor, n2.orgFactor));
+                    if (n.isAnomaly || n2.isAnomaly) {
+                       ctx.strokeStyle = `rgba(255, 122, 107, ${op})`;
+                    } else {
+                       ctx.strokeStyle = `rgba(255, 255, 255, ${op * 0.3})`; 
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(n.x, n.y);
+                    ctx.lineTo(n2.x, n2.y);
+                    ctx.stroke();
+                 }
+               }
+             }
+
+             if (n.orgFactor > 0.2 && !n.isAnomaly) {
+                for (let nid of n.neighbors) {
+                   let n2 = nodes[nid];
+                   let op = Math.min(n.orgFactor, n2.orgFactor);
+                   ctx.strokeStyle = `rgba(0, 229, 204, ${op * 0.7})`; 
+                   ctx.lineWidth = 1;
+                   ctx.beginPath();
+                   ctx.moveTo(n.x, n.y);
+                   ctx.lineTo(n2.x, n2.y);
+                   ctx.stroke();
+                }
+             }
+             
+             let op = 1;
+             if (n.isAnomaly) {
+                op = 1 - n.orgFactor * 2; 
+                if (op <= 0) continue;
+             }
+
+             ctx.beginPath();
+             ctx.arc(n.x, n.y, n.isAnomaly ? 2 : 2.5, 0, Math.PI * 2);
+             
+             if (n.isAnomaly) {
+                ctx.fillStyle = `rgba(255, 122, 107, ${op})`;
+                ctx.fill();
+                ctx.shadowColor = `rgba(255, 122, 107, ${op})`;
+                ctx.shadowBlur = 8;
+             } else {
+                let r = 255 * (1 - n.orgFactor) + 0 * n.orgFactor;
+                let g = 255 * (1 - n.orgFactor) + 229 * n.orgFactor;
+                let b = 255 * (1 - n.orgFactor) + 204 * n.orgFactor;
+                
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${op * 0.8})`;
+                ctx.fill();
+                
+                if (n.orgFactor > 0.5) {
+                  ctx.shadowColor = `rgba(0, 229, 204, ${(n.orgFactor - 0.5) * 2})`;
+                  ctx.shadowBlur = 10 * (n.orgFactor - 0.5) * 2;
+                } else {
+                  ctx.shadowBlur = 0;
+                }
+             }
+             ctx.shadowBlur = 0;
+          }
+      }
+
+      function animate(time) {
+          if (scrollProgress < 1.0) {
+              render(time);
+          }
+          requestAnimationFrame(animate);
+      }
+      
+      window.addEventListener('resize', resize);
+      resize();
+      requestAnimationFrame(animate);
+
+      window.addEventListener('scroll', () => {
+        let vh = window.innerHeight;
+        let scrollY = window.scrollY;
+        
+        scrollProgress = Math.min(Math.max(scrollY / (vh * 3.0), 0), 1);
+        
+        let heroLogo = document.getElementById('hero-logo');
+        let logoP = 0;
+        let easeP = 0;
+        if (heroLogo) {
+           logoP = Math.min(Math.max((scrollProgress - 0.05) / 0.1, 0), 1);
+           easeP = 1 - Math.pow(1 - logoP, 3); // Swift cubic ease out
+           
+           heroLogo.style.opacity = easeP.toString();
+           heroLogo.style.transform = `scale(${0.8 + easeP * 0.2})`;
+           
+           let glowP = Math.min(Math.max((scrollProgress - 0.3) / 0.3, 0), 1);
+           heroLogo.style.filter = `drop-shadow(0 0 ${glowP * 24}px rgba(0, 229, 204, ${glowP * 0.9}))`;
+        }
+        
+        let shiftEm = easeP * 0.55;
+        
+        if (scrollProgress < 0.3) {
+          centerText.style.opacity = '1';
+          centerText.style.transform = `translate(calc(-50% + ${shiftEm}em), -50%) scale(1)`;
+        } else {
+          const p = (scrollProgress - 0.3) / 0.7;
+          centerText.style.opacity = '1';
+          centerText.style.transform = `translate(calc(-50% + ${shiftEm}em), -50%) scale(${1 + p * 0.15})`;
+        }
+        
+        if (scrollProgress > 0.02 && scrollProgress < 0.95) {
+            hud.style.opacity = 1;
+            hudStats.style.opacity = 1;
+        } else {
+            hud.style.opacity = 0;
+            hudStats.style.opacity = 0;
+        }
+
+        let log1 = document.getElementById('hud-log-1');
+        let log2 = document.getElementById('hud-log-2');
+        let log3 = document.getElementById('hud-log-3');
+        let sNodes = document.getElementById('stat-nodes');
+        let sWaste = document.getElementById('stat-waste');
+        let sStatus = document.getElementById('stat-status');
+        
+        if (scrollProgress < 0.2) {
+            log1.innerText = "> Initializing neural mesh tracking...";
+            log2.innerText = "> Pattern recognition offline.";
+            log3.innerText = "> Chaos level: Critical";
+            sNodes.innerText = "2,841"; sNodes.style.color = "#ff7a6b";
+            sWaste.innerText = "74%"; sWaste.style.color = "#ff7a6b";
+            sStatus.innerText = "CHAOTIC"; sStatus.style.color = "#ff7a6b";
+        } else if (scrollProgress < 0.6) {
+            log1.innerText = "> Scanline sweep active.";
+            log2.innerText = "> Forcing coordinate realignment...";
+            log3.innerText = "> Pruning orphaned processes.";
+            sNodes.innerText = "1,402"; sNodes.style.color = "rgba(255,255,255,0.8)";
+            sWaste.innerText = "31%"; sWaste.style.color = "rgba(255,255,255,0.8)";
+            sStatus.innerText = "ANALYZING"; sStatus.style.color = "rgba(255,255,255,0.8)";
+        } else {
+            log1.innerText = "> Topological grid stabilized.";
+            log2.innerText = "> Process vectors locked.";
+            log3.innerText = "> Insights applied. Architecture optimized.";
+            sNodes.innerText = "0"; sNodes.style.color = "#00E5CC";
+            sWaste.innerText = "0%"; sWaste.style.color = "#00E5CC";
+            sStatus.innerText = "OPTIMIZED"; sStatus.style.color = "#00E5CC";
+        }
+        
+        let fadeOutProgress = 0;
+        if (scrollY > vh * 3.0) {
+          fadeOutProgress = Math.min((scrollY - (vh * 3.0)) / (vh * 0.5), 1);
+        }
+        
+        entryLayer.style.opacity = 1 - fadeOutProgress;
+        
+        if (fadeOutProgress >= 1) {
+          entryLayer.style.pointerEvents = "none";
+          entryLayer.style.display = "none";
+        } else {
+          entryLayer.style.display = "flex";
+        }
+      });
+      
+    })();
+  </script>
+
+  <!-- Modal -->
+  <div id="how-modal" class="modal-overlay" onclick="if(event.target === this) this.classList.remove('active')">
+    <div class="modal-content">
+      <button class="modal-close" onclick="document.getElementById('how-modal').classList.remove('active')">×</button>
+      <div class="modal-body" style="font-family: var(--mono); font-size: 13px;">
+        <h2 style="font-family: var(--serif); font-size: 28px; margin-top: 0; margin-bottom: 24px; font-weight: 400; color: var(--ink);">How Pulse Works</h2>
+        <p>Pulse runs a lightweight daemon on your machine (under 3% CPU) that watches four signals simultaneously:</p>
+        
+        <h3>1. Process & port fingerprinting</h3>
+        <p>Identifies AI tools by their process names and network ports. Ollama on port 11434. Cursor by binary path. Claude Code by process name.</p>
+        
+        <h3>2. Network traffic patterns</h3>
+        <p>Monitors connections to known AI provider endpoints — Anthropic, OpenAI, Google, Cursor, GitHub Copilot — using metadata only. Never payload content.</p>
+        
+        <h3>3. Hardware behavioral signatures</h3>
+        <p>Reads GPU utilisation, power draw, and thermal state directly from Apple Silicon hardware (IOReport). Distinguishes inference workloads from rendering or gaming by their hardware fingerprint.</p>
+        
+        <h3>4. OS event tracing</h3>
+        <p>Subscribes to process lifecycle events to detect workload starts and stops with sub-second latency.</p>
+        
+        <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line);">These four signals are combined into a confidence score for each detected workload. The analytics engine then correlates workloads with hardware behaviour every five seconds, surfacing patterns — memory saturation, GPU contention, thermal attribution — as plain-language insights.</p>
+        
+        <p style="color: var(--accent); font-weight: 500; font-size: 14px; margin-top: 16px;">Everything runs locally. Nothing leaves your machine.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
