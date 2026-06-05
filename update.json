@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1-test",
+  "notes": "See https://github.com/mirzamudabbir-dev/ArbiterPulse-LandingPage/releases/tag/v0.0.1-test",
+  "pub_date": "2026-06-05T20:18:42Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "",
+      "url": "https://github.com/mirzamudabbir-dev/ArbiterPulse-LandingPage/releases/download/v0.0.1-test/Pulse_aarch64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "",
+      "url": "https://github.com/mirzamudabbir-dev/ArbiterPulse-LandingPage/releases/download/v0.0.1-test/Pulse_x64-setup.exe"
+    }
+  }
+}
